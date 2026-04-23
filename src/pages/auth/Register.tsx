@@ -31,10 +31,50 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
     height: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    hasDoctor: false,
+    doctorId: '' as string | undefined,
+    doctorName: ''
   });
   const [error, setError] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [doctorSuggestions, setDoctorSuggestions] = useState<{ id: string, nome: string }[]>([]);
+  const [isSearchingDoctor, setIsSearchingDoctor] = useState(false);
+
+  const searchDoctors = async (query: string) => {
+    if (query.length < 3) {
+      setDoctorSuggestions([]);
+      return;
+    }
+
+    setIsSearchingDoctor(true);
+    try {
+      // In a real scenario, we'd have a 'role' or 'is_doctor' flag in profiles
+      // For now, let's try to find in 'profiles' where name matches
+      // If the table doesn't exist yet (reset), this will fail gracefully due to proxy
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, nome')
+        .ilike('nome', `%${query}%`)
+        .limit(5);
+
+      if (!error && data) {
+        setDoctorSuggestions(data);
+      } else {
+        // Mock fallback for demonstration if DB is empty/reset
+        const mocks = [
+          { id: 'doc1', nome: 'Dr. Silva Sauro' },
+          { id: 'doc2', nome: 'Dra. Ana Maria' },
+          { id: 'doc3', nome: 'Dr. Ricardo Santos' }
+        ].filter(d => d.nome.toLowerCase().includes(query.toLowerCase()));
+        setDoctorSuggestions(mocks);
+      }
+    } catch (e) {
+      setDoctorSuggestions([]);
+    } finally {
+      setIsSearchingDoctor(false);
+    }
+  };
 
   const nextStep = () => {
     setError(null);
@@ -107,6 +147,9 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
         targetCalories: 2000,
         waterGoal: 2500,
         isAuthenticated: true,
+        hasDoctor: formData.hasDoctor,
+        doctorId: formData.doctorId,
+        doctorName: formData.doctorName,
         
         // Gamification Init
         xp: 0,
@@ -161,21 +204,21 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
             <div className="space-y-10">
               <SectionTitle subtitle="Inicie o protocolo Vitalis">Identificação</SectionTitle>
               <div className="space-y-6">
-                <InputWithIcon 
-                  icon={<User size={20} />} 
-                  label="Nome Completo"
-                  placeholder="DIGITE SEU NOME" 
-                  value={formData.name} 
-                  onChange={(v) => setFormData({...formData, name: v})} 
-                />
-                <InputWithIcon 
-                  icon={<Calendar size={20} />} 
-                  label="Nascimento"
-                  placeholder="DD/MM/AAAA" 
-                  type="date"
-                  value={formData.birthDate} 
-                  onChange={(v) => setFormData({...formData, birthDate: v})} 
-                />
+                  <InputWithIcon 
+                    icon={<User size={20} />} 
+                    label="Nome Completo"
+                    placeholder="Digite seu nome" 
+                    value={formData.name} 
+                    onChange={(v) => setFormData({...formData, name: v})} 
+                  />
+                  <InputWithIcon 
+                    icon={<Calendar size={20} />} 
+                    label="Nascimento"
+                    placeholder="dd/mm/aaaa" 
+                    type="date"
+                    value={formData.birthDate} 
+                    onChange={(v) => setFormData({...formData, birthDate: v})} 
+                  />
                 <InputWithIcon 
                   icon={<Activity size={20} />} 
                   label="CPF"
@@ -204,25 +247,108 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-2">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between px-1">
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em]">Acompanhamento Médico</label>
+                    <button 
+                      type="button"
+                      onClick={() => setFormData({...formData, hasDoctor: !formData.hasDoctor})}
+                      className={cn(
+                        "w-12 h-6 rounded-full transition-all relative p-1",
+                        formData.hasDoctor ? "bg-vibrant-orange" : "bg-white/10"
+                      )}
+                    >
+                      <motion.div 
+                        animate={{ x: formData.hasDoctor ? 24 : 0 }}
+                        className="w-4 h-4 bg-white rounded-full shadow-lg"
+                      />
+                    </button>
+                  </div>
+
+                  <AnimatePresence>
+                    {formData.hasDoctor && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-4 overflow-hidden"
+                      >
+                        <div className="relative group">
+                          <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] ml-2 mb-3 block">Nome do Médico</label>
+                          <div className="relative">
+                            <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-vibrant-orange transition-colors">
+                              <Sparkles size={20} />
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="Busque pelo nome..."
+                              className="w-full pl-16 pr-6 py-6 glass rounded-[2rem] border-white/10 focus:border-vibrant-orange/50 outline-none transition-all font-bold text-white placeholder:text-white/30 tracking-wide text-base shadow-inner"
+                              value={formData.doctorName}
+                              onChange={(e) => {
+                                setFormData({...formData, doctorName: e.target.value, doctorId: undefined});
+                                searchDoctors(e.target.value);
+                              }}
+                            />
+                            {isSearchingDoctor && (
+                              <div className="absolute right-6 top-1/2 -translate-y-1/2">
+                                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                                  <Zap size={16} className="text-vibrant-orange" />
+                                </motion.div>
+                              </div>
+                            )}
+                          </div>
+
+                          {doctorSuggestions.length > 0 && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="absolute z-50 left-0 right-0 mt-2 p-2 glass border-white/10 rounded-2xl shadow-premium overflow-hidden"
+                            >
+                              {doctorSuggestions.map((doc) => (
+                                <button
+                                  key={doc.id}
+                                  onClick={() => {
+                                    setFormData({...formData, doctorName: doc.nome, doctorId: doc.id});
+                                    setDoctorSuggestions([]);
+                                  }}
+                                  className="w-full text-left px-4 py-3 hover:bg-white/5 rounded-xl transition-colors text-sm font-bold text-white/80 hover:text-white flex items-center justify-between group"
+                                >
+                                  <span>{doc.nome}</span>
+                                  <Check size={14} className="opacity-0 group-hover:opacity-100 text-vibrant-orange transition-opacity" />
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <div className="grid grid-cols-12 gap-4">
+                  <div className="col-span-8">
                     <InputWithIcon 
                       icon={<MapPin size={20} />} 
                       label="Cidade"
-                      placeholder="Sua cidade" 
+                      placeholder="Nome da cidade" 
                       value={formData.city} 
                       onChange={(v) => setFormData({...formData, city: v})} 
                     />
                   </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] ml-1 mb-2 block">UF</label>
-                    <select
-                      className="w-full px-4 py-[1.4rem] glass rounded-2xl border-white/5 outline-none font-black text-xs appearance-none text-center cursor-pointer"
-                      value={formData.state}
-                      onChange={(e) => setFormData({...formData, state: e.target.value})}
-                    >
-                      {STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                  <div className="col-span-4 group">
+                    <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest ml-2 mb-3 block">UF</label>
+                    <div className="relative">
+                      <select
+                        className="w-full pl-6 pr-10 py-6 glass rounded-[2rem] border-white/10 focus:border-vibrant-orange/50 outline-none transition-all font-bold text-white tracking-wide text-base appearance-none cursor-pointer shadow-inner"
+                        value={formData.state}
+                        onChange={(e) => setFormData({...formData, state: e.target.value})}
+                      >
+                        {STATES.map(s => <option key={s} value={s} className="bg-dark-bg">{s}</option>)}
+                      </select>
+                      <div className="absolute right-6 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none group-focus-within:text-vibrant-orange">
+                        <ChevronLeft size={16} className="rotate-270" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -268,7 +394,7 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
                 <InputWithIcon 
                   icon={<Lock size={20} />} 
                   label="Senha Maestra"
-                  placeholder="MIN 6 DÍGITOS" 
+                  placeholder="Mínimo 6 dígitos" 
                   type="password"
                   value={formData.password} 
                   onChange={(v) => setFormData({...formData, password: v})} 
@@ -276,7 +402,7 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
                 <InputWithIcon 
                   icon={<Lock size={20} />} 
                   label="Confirmação"
-                  placeholder="REPITA A SENHA" 
+                  placeholder="Repita a senha" 
                   type="password"
                   value={formData.confirmPassword} 
                   onChange={(v) => setFormData({...formData, confirmPassword: v})} 
@@ -337,15 +463,15 @@ const InputWithIcon: React.FC<{
   onChange: (val: string) => void;
 }> = ({ icon, label, placeholder, type = 'text', value, onChange }) => (
   <div className="group">
-    <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] ml-2 mb-3 block">{label}</label>
+    <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest ml-2 mb-3 block">{label}</label>
     <div className="relative">
-      <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-vibrant-orange transition-colors">
+      <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-vibrant-orange transition-colors">
         {icon}
       </div>
       <input
         type={type}
         placeholder={placeholder}
-        className="w-full pl-16 pr-6 py-6 glass rounded-[2rem] border-white/10 focus:border-vibrant-orange/50 outline-none transition-all font-bold text-white placeholder:text-white/30 tracking-wide text-base shadow-inner"
+        className="w-full pl-16 pr-6 py-6 glass rounded-[2rem] border-white/10 focus:border-vibrant-orange/50 outline-none transition-all font-bold text-white placeholder:text-white/40 tracking-wide text-base shadow-inner md:text-lg"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />

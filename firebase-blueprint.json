@@ -1,0 +1,35 @@
+{
+  "entities": {
+    "Profile": {
+      "title": "Perfil do Usuário",
+      "description": "Dados completos do usuário consolidando informações de autenticação, biometria e vínculo médico.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "description": "ID do usuário vinculado ao Auth" },
+        "nome": { "type": "string", "description": "Nome completo do usuário" },
+        "email": { "type": "string", "format": "email", "description": "E-mail de cadastro" },
+        "cpf": { "type": "string", "description": "CPF mascarado" },
+        "data_nascimento": { "type": "string", "format": "date", "description": "Data de nascimento" },
+        "genero": { "type": "string", "enum": ["male", "female", "other"], "description": "Gênero biológico" },
+        "cidade": { "type": "string", "description": "Cidade de residência" },
+        "estado": { "type": "string", "description": "UF (Estado)" },
+        "peso": { "type": "number", "description": "Massa corporal em KG" },
+        "altura": { "type": "number", "description": "Estatura em CM" },
+        "has_doctor": { "type": "boolean", "description": "Se possui acompanhamento médico" },
+        "doctor_name": { "type": "string", "description": "Nome do médico responsável" },
+        "doctor_id": { "type": "string", "format": "uuid", "description": "ID do médico se estiver cadastrado no app" },
+        "xp": { "type": "integer", "description": "Experiência acumulada" },
+        "nivel": { "type": "integer", "description": "Nível atual" },
+        "streak": { "type": "integer", "description": "Dias consecutivos de uso" },
+        "updated_at": { "type": "string", "format": "date-time", "description": "Última atualização" }
+      },
+      "required": ["id", "nome", "email", "cpf"]
+    }
+  },
+  "firestore": {
+    "/profiles/{userId}": {
+      "schema": "Profile",
+      "description": "Informações de perfil dos usuários do Vitalis"
+    }
+  }
+}

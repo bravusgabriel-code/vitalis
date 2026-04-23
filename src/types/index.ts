@@ -20,6 +20,11 @@ export interface UserProfile {
   waterGoal: number; // in ml
   isAuthenticated?: boolean;
   
+  // Doctor/Medical Link
+  hasDoctor?: boolean;
+  doctorId?: string;
+  doctorName?: string;
+  
   // Gamification Fields
   xp: number;
   level: number;

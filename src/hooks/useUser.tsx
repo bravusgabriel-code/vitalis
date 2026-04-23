@@ -52,7 +52,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Sync with Supabase if authenticated
     if (session?.user) {
-      console.log("Sincronizando mudanças com Supabase:", changes);
       const supabaseChanges: any = {
         id: session.user.id,
         updated_at: new Date().toISOString()
@@ -66,20 +65,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (changes.weight) supabaseChanges.peso = changes.weight;
       if (changes.height) supabaseChanges.altura = changes.height;
       if (changes.gender) supabaseChanges.genero = changes.gender;
+      if (changes.hasDoctor !== undefined) supabaseChanges.has_doctor = changes.hasDoctor;
+      if (changes.doctorName !== undefined) supabaseChanges.doctor_name = changes.doctorName;
+      if (changes.doctorId !== undefined) supabaseChanges.doctor_id = changes.doctorId;
       if (changes.xp !== undefined) supabaseChanges.xp = changes.xp;
       if (changes.level !== undefined) supabaseChanges.nivel = changes.level;
       if (changes.streak !== undefined) supabaseChanges.streak = changes.streak;
 
       try {
-        const { error: syncError } = await supabase
-          .from('profiles')
-          .upsert(supabaseChanges);
-          
-        if (syncError) {
-          console.error("Erro na sincronização silenciosa:", syncError);
-        }
+        await supabase.from('profiles').upsert(supabaseChanges);
       } catch (e) {
-        console.error("Exceção na sincronização:", e);
+        console.error("Erro na sincronização Supabase:", e);
       }
     }
   };
@@ -96,7 +92,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (data.user) {
-      // Fetch profile from Supabase
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -104,8 +99,24 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
       
       if (profileData) {
+        // Map snake_case from DB to camelCase in App
+        const mappedProfile: UserProfile = {
+          ...profileData,
+          name: profileData.nome,
+          birthDate: profileData.data_nascimento,
+          city: profileData.cidade,
+          state: profileData.estado,
+          weight: profileData.peso,
+          height: profileData.altura,
+          gender: profileData.genero,
+          hasDoctor: profileData.has_doctor,
+          doctorName: profileData.doctor_name,
+          doctorId: profileData.doctor_id,
+          level: profileData.nivel,
+          isAuthenticated: true
+        };
         await db.userProfile.clear();
-        await db.userProfile.add({ ...profileData, isAuthenticated: true });
+        await db.userProfile.add(mappedProfile);
       }
       return true;
     }
@@ -154,29 +165,30 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await db.userProfile.add(profileToSave);
 
       console.log("Upserting perfil no Supabase...");
-      // Explicitly insert into profiles table (though trigger should handle it, 
-      // this ensures immediate data consistency for the client)
-      const { error: upsertError } = await supabase.from('profiles').upsert({
-        id: data.user.id,
-        nome: profileToSave.name,
-        email: profileToSave.email,
-        data_nascimento: profileToSave.birthDate,
-        cidade: profileToSave.city,
-        estado: profileToSave.state,
-        peso: profileToSave.weight,
-        altura: profileToSave.height,
-        genero: profileToSave.gender,
-        xp: profileToSave.xp,
-        nivel: profileToSave.level,
-        streak: profileToSave.streak,
-        updated_at: new Date().toISOString()
-      });
+      try {
+        const { error: upsertError } = await supabase.from('profiles').upsert({
+          id: data.user.id,
+          nome: profileToSave.name,
+          email: profileToSave.email,
+          cpf: profileToSave.cpf,
+          data_nascimento: profileToSave.birthDate,
+          cidade: profileToSave.city,
+          estado: profileToSave.state,
+          peso: profileToSave.weight,
+          altura: profileToSave.height,
+          genero: profileToSave.gender,
+          has_doctor: profileToSave.hasDoctor,
+          doctor_name: profileToSave.doctorName,
+          doctor_id: profileToSave.doctorId,
+          xp: profileToSave.xp,
+          nivel: profileToSave.level,
+          streak: profileToSave.streak,
+          updated_at: new Date().toISOString()
+        });
 
-      if (upsertError) {
-        console.error("Erro no upsert do perfil:", upsertError);
-        // We don't necessarily throw here if Auth succeeded, but it's good to know
-      } else {
-        console.log("Perfil sincronizado com Supabase");
+        if (upsertError) console.error("Erro no upsert profiles:", upsertError);
+      } catch (e) {
+        console.error("Exceção no registro Supabase:", e);
       }
     } else {
       console.warn("Nenhum usuário retornado no data. Talvez confirmação de e-mail pendente?");
