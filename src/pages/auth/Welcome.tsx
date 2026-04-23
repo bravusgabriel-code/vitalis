@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Card } from '../../components/UI';
 import { motion } from 'framer-motion';
-import { Activity, Zap, TrendingUp, ShieldCheck } from 'lucide-react';
+import { Activity, Zap, TrendingUp, ShieldCheck, Database, AlertTriangle } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 interface WelcomeProps {
   onLogin: () => void;
@@ -9,6 +10,12 @@ interface WelcomeProps {
 }
 
 export const Welcome: React.FC<WelcomeProps> = ({ onLogin, onRegister }) => {
+  const [isConfigured, setIsConfigured] = useState(true);
+
+  useEffect(() => {
+    setIsConfigured(supabase.isConfigured);
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-10 bg-dark-bg relative overflow-hidden">
       {/* Visual Identity Background */}
@@ -16,6 +23,22 @@ export const Welcome: React.FC<WelcomeProps> = ({ onLogin, onRegister }) => {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-vibrant-orange/5 blur-[150px] rounded-full animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-vibrant-orange/10 blur-[100px] rounded-full" />
       </div>
+
+      {!isConfigured && (
+        <motion.div 
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute top-10 left-10 right-10 z-50 glass border-red-500/20 p-4 rounded-2xl flex items-center gap-4"
+        >
+          <div className="h-10 w-10 bg-red-500/10 rounded-xl flex items-center justify-center text-red-500">
+            <AlertTriangle size={20} />
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] font-black text-red-500 uppercase tracking-widest leading-tight">Supabase não configurado</p>
+            <p className="text-[9px] text-white/40 font-medium leading-tight mt-1">Configure VITE_SUPABASE_URL e KEY nos Secrets.</p>
+          </div>
+        </motion.div>
+      )}
 
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}

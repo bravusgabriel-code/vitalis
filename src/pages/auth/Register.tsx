@@ -123,7 +123,12 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
     }
 
     if (!supabase.isConfigured) {
-      setError('ERRO DE CONEXÃO COM SERVIDOR. TENTE NOVAMENTE.');
+      const diag = supabase.getDiagnosticInfo();
+      let msg = 'CONFIGURAÇÃO SUPABASE AUSENTE.';
+      if (!diag.hasUrl) msg += ' URL faltando.';
+      if (diag.hasUrl && !diag.isValidUrl) msg += ' URL inválida.';
+      if (!diag.hasAnonKey) msg += ' Chave Anon faltando.';
+      setError(msg + ' Verifique os Secrets no AI Studio.');
       return;
     }
 

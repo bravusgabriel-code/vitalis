@@ -31,6 +31,16 @@ export const supabase = new Proxy({} as any, {
     const isConfigured = !!(isValidUrl && supabaseAnonKey);
 
     if (prop === 'isConfigured') return isConfigured;
+    
+    if (prop === 'getDiagnosticInfo') {
+      return () => ({
+        isConfigured,
+        hasUrl: !!supabaseUrl,
+        isValidUrl,
+        hasAnonKey: !!supabaseAnonKey,
+        urlPrefix: supabaseUrl ? supabaseUrl.substring(0, 5) : 'none'
+      });
+    }
 
     if (!supabaseClient) {
       if (!isConfigured) {

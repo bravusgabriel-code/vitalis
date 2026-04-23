@@ -31,6 +31,19 @@ export const Login: React.FC<LoginProps> = ({ onBack }) => {
     }
 
     setIsLoggingIn(true);
+    
+    // Check configuration
+    const { supabase } = await import('../../lib/supabase');
+    if (!supabase.isConfigured) {
+      const diag = supabase.getDiagnosticInfo();
+      let msg = 'SUPABASE NÃO CONFIGURADO.';
+      if (!diag.hasUrl) msg += ' URL faltando.';
+      if (!diag.hasAnonKey) msg += ' Chave Anon faltando.';
+      setError(msg);
+      setIsLoggingIn(false);
+      return;
+    }
+
     try {
       const success = await login(email, password);
       if (!success) {
