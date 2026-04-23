@@ -32,7 +32,17 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`PRODUCTION SERVER STARTED`);
+    console.log(`Port: ${PORT}`);
+    console.log(`Node Version: ${process.version}`);
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  });
+
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
   });
 }
 
