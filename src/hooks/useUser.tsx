@@ -52,13 +52,35 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Sync with Supabase if authenticated
     if (session?.user) {
-      await supabase
-        .from('profiles')
-        .upsert({
-          id: session.user.id,
-          ...changes,
-          updated_at: new Date().toISOString(),
-        });
+      console.log("Sincronizando mudanças com Supabase:", changes);
+      const supabaseChanges: any = {
+        id: session.user.id,
+        updated_at: new Date().toISOString()
+      };
+
+      if (changes.name) supabaseChanges.nome = changes.name;
+      if (changes.email) supabaseChanges.email = changes.email;
+      if (changes.birthDate) supabaseChanges.data_nascimento = changes.birthDate;
+      if (changes.city) supabaseChanges.cidade = changes.city;
+      if (changes.state) supabaseChanges.estado = changes.state;
+      if (changes.weight) supabaseChanges.peso = changes.weight;
+      if (changes.height) supabaseChanges.altura = changes.height;
+      if (changes.gender) supabaseChanges.genero = changes.gender;
+      if (changes.xp !== undefined) supabaseChanges.xp = changes.xp;
+      if (changes.level !== undefined) supabaseChanges.nivel = changes.level;
+      if (changes.streak !== undefined) supabaseChanges.streak = changes.streak;
+
+      try {
+        const { error: syncError } = await supabase
+          .from('profiles')
+          .upsert(supabaseChanges);
+          
+        if (syncError) {
+          console.error("Erro na sincronização silenciosa:", syncError);
+        }
+      } catch (e) {
+        console.error("Exceção na sincronização:", e);
+      }
     }
   };
 
@@ -99,6 +121,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (newProfile: UserProfile) => {
+    console.log("Chamando supabase.auth.signUp...");
     const { data, error } = await supabase.auth.signUp({
       email: newProfile.email,
       password: newProfile.password!,
@@ -110,9 +133,15 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    if (error) throw error;
+    console.log("Resultado signUp:", { data, error });
+
+    if (error) {
+      console.error("Erro no signUp:", error);
+      throw error;
+    }
 
     if (data.user) {
+      console.log("Usuário criado no Auth. ID:", data.user.id);
       const profileToSave = { 
         ...newProfile, 
         id: data.user.id,
@@ -120,16 +149,37 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       delete (profileToSave as any).password; // Don't store password in public table
 
+      console.log("Limpando Dexie e salvando perfil local...");
       await db.userProfile.clear();
       await db.userProfile.add(profileToSave);
 
+      console.log("Upserting perfil no Supabase...");
       // Explicitly insert into profiles table (though trigger should handle it, 
       // this ensures immediate data consistency for the client)
-      await supabase.from('profiles').upsert({
+      const { error: upsertError } = await supabase.from('profiles').upsert({
         id: data.user.id,
-        ...profileToSave,
+        nome: profileToSave.name,
+        email: profileToSave.email,
+        data_nascimento: profileToSave.birthDate,
+        cidade: profileToSave.city,
+        estado: profileToSave.state,
+        peso: profileToSave.weight,
+        altura: profileToSave.height,
+        genero: profileToSave.gender,
+        xp: profileToSave.xp,
+        nivel: profileToSave.level,
+        streak: profileToSave.streak,
         updated_at: new Date().toISOString()
       });
+
+      if (upsertError) {
+        console.error("Erro no upsert do perfil:", upsertError);
+        // We don't necessarily throw here if Auth succeeded, but it's good to know
+      } else {
+        console.log("Perfil sincronizado com Supabase");
+      }
+    } else {
+      console.warn("Nenhum usuário retornado no data. Talvez confirmação de e-mail pendente?");
     }
   };
 

@@ -28,8 +28,8 @@ export const Card: React.FC<CardProps> = ({ children, className, variant = 'glas
 };
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'accent';
-  size?: 'sm' | 'md' | 'lg' | 'icon';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'accent' | 'premium';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'icon';
 }
 
 export const Button: React.FC<ButtonProps> = ({ 
@@ -45,12 +45,14 @@ export const Button: React.FC<ButtonProps> = ({
     ghost: "bg-transparent text-muted-text hover:text-white hover:bg-white/[0.03]",
     danger: "bg-red-500/10 text-red-500 hover:bg-red-500/20",
     accent: "bg-white text-black hover:bg-white/90 shadow-lg shadow-white/5",
+    premium: "bg-orange-gradient text-white shadow-glow border-none",
   };
 
   const sizes = {
     sm: "px-4 py-2 text-[11px]",
     md: "px-6 py-2.5 text-[13px]",
     lg: "px-8 py-3.5 text-[15px]",
+    xl: "px-10 py-5 text-lg",
     icon: "p-3 rounded-full",
   };
 

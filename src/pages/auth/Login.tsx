@@ -14,6 +14,7 @@ export const Login: React.FC<LoginProps> = ({ onBack }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,9 +30,16 @@ export const Login: React.FC<LoginProps> = ({ onBack }) => {
       return;
     }
 
-    const success = await login(email, password);
-    if (!success) {
-      setError('CREDENCIAIS INCORRETAS');
+    setIsLoggingIn(true);
+    try {
+      const success = await login(email, password);
+      if (!success) {
+        setError('CREDENCIAIS INCORRETAS');
+      }
+    } catch (err: any) {
+      setError(err.message || 'ERRO AO AUTENTICAR');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -108,8 +116,14 @@ export const Login: React.FC<LoginProps> = ({ onBack }) => {
           </AnimatePresence>
 
           <div className="space-y-6 pt-4">
-            <Button type="submit" variant="premium" size="xl" className="w-full h-18 rounded-[2.5rem] shadow-glow flex items-center justify-center gap-3">
-              AUTENTICAR <Zap size={20} fill="currentColor" />
+            <Button 
+              type="submit" 
+              variant="premium" 
+              size="xl" 
+              disabled={isLoggingIn}
+              className="w-full h-18 rounded-[2.5rem] shadow-glow flex items-center justify-center gap-3"
+            >
+              {isLoggingIn ? "PROCESSANDO..." : "AUTENTICAR"} <Zap size={20} fill="currentColor" />
             </Button>
             <button 
               type="button" 

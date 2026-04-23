@@ -33,6 +33,7 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
     confirmPassword: ''
   });
   const [error, setError] = useState<string | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const nextStep = () => {
     setError(null);
@@ -80,37 +81,47 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
       return;
     }
 
-    await register({
-      name: formData.name,
-      email: formData.email,
-      password: formData.password,
-      cpf: formData.cpf,
-      birthDate: formData.birthDate,
-      city: formData.city,
-      state: formData.state,
-      weight: parseFloat(formData.weight),
-      height: parseFloat(formData.height),
-      age: 25,
-      gender: formData.gender,
-      goal: 'maintain',
-      activityLevel: 1.2,
-      targetCalories: 2000,
-      waterGoal: 2500,
-      isAuthenticated: true,
-      
-      // Gamification Init
-      xp: 0,
-      level: 1,
-      streak: 0,
-      achievements: [],
-      totalWeightLifted: 0,
-      totalCardioDistance: 0,
-      waterDaysCount: 0,
-      nutritionDaysCount: 0,
-      missionsCompletedCount: 0,
-      appUsageDaysCount: 0,
-      lastActiveDate: ''
-    });
+    setIsRegistering(true);
+    try {
+      console.log("Iniciando registro para:", formData.email);
+      await register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        cpf: formData.cpf,
+        birthDate: formData.birthDate,
+        city: formData.city,
+        state: formData.state,
+        weight: parseFloat(formData.weight),
+        height: parseFloat(formData.height),
+        age: 25,
+        gender: formData.gender,
+        goal: 'maintain',
+        activityLevel: 1.2,
+        targetCalories: 2000,
+        waterGoal: 2500,
+        isAuthenticated: true,
+        
+        // Gamification Init
+        xp: 0,
+        level: 1,
+        streak: 0,
+        achievements: [],
+        totalWeightLifted: 0,
+        totalCardioDistance: 0,
+        waterDaysCount: 0,
+        nutritionDaysCount: 0,
+        missionsCompletedCount: 0,
+        appUsageDaysCount: 0,
+        lastActiveDate: ''
+      });
+      console.log("Registro solicitado com sucesso");
+    } catch (err: any) {
+      console.error("Erro capturado no Register.tsx:", err);
+      setError(err.message || 'ERRO AO CRIAR CONTA. TENTE NOVAMENTE.');
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
   return (
@@ -277,8 +288,18 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
               PRÓXIMO PASSO
             </Button>
           ) : (
-            <Button variant="premium" size="xl" onClick={handleFinish} className="w-full h-18 rounded-[2.5rem] shadow-glow flex items-center justify-center gap-3 text-lg">
-              HABILITAR VITALIS <Zap size={22} fill="currentColor" />
+            <Button 
+              variant="premium" 
+              size="xl" 
+              onClick={handleFinish} 
+              disabled={isRegistering}
+              className="w-full h-18 rounded-[2.5rem] shadow-glow flex items-center justify-center gap-3 text-lg"
+            >
+              {isRegistering ? (
+                <>PROCESSANDO... <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Sparkles size={22} /></motion.div></>
+              ) : (
+                <>HABILITAR VITALIS <Zap size={22} fill="currentColor" /></>
+              )}
             </Button>
           )}
         </div>
