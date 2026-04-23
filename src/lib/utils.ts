@@ -40,6 +40,20 @@ export function maskCPF(value: string): string {
     .replace(/(-\d{2})\d+?$/, '$1');
 }
 
+export function calculateAge(birthDate: string): number {
+  if (!birthDate) return 0;
+  const hoy = new Date();
+  const nacimiento = new Date(birthDate);
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const mes = hoy.getMonth() - nacimiento.getMonth();
+
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
+    edad--;
+  }
+
+  return edad;
+}
+
 export function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);

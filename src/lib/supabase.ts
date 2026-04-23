@@ -27,10 +27,13 @@ const mockSupabase = {
 
 export const supabase = new Proxy({} as any, {
   get(target, prop) {
+    const isValidUrl = supabaseUrl && (supabaseUrl.startsWith('http://') || supabaseUrl.startsWith('https://'));
+    const isConfigured = !!(isValidUrl && supabaseAnonKey);
+
+    if (prop === 'isConfigured') return isConfigured;
+
     if (!supabaseClient) {
-      const isValidUrl = supabaseUrl && (supabaseUrl.startsWith('http://') || supabaseUrl.startsWith('https://'));
-      
-      if (!isValidUrl || !supabaseAnonKey) {
+      if (!isConfigured) {
         if (!(globalThis as any).__supabase_warned) {
           console.warn('Supabase URL or Anon Key is missing or invalid. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment variables.');
           (globalThis as any).__supabase_warned = true;

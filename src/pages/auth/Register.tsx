@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Button, Card, SectionTitle } from '../../components/UI';
 import { useUser } from '../../hooks/useUser';
-import { validateEmail, validateCPF, maskCPF } from '../../lib/utils';
-import { ChevronLeft, User, Calendar, MapPin, Scale, Ruler, Mail, Lock, Check, Sparkles, Activity, Zap } from 'lucide-react';
+import { validateEmail, validateCPF, maskCPF, calculateAge } from '../../lib/utils';
+import { supabase } from '../../lib/supabase';
+import { ChevronLeft, User, Calendar, MapPin, Scale, Ruler, Mail, Lock, Check, Sparkles, Activity, Zap, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
@@ -81,6 +82,11 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
       return;
     }
 
+    if (!supabase.isConfigured) {
+      setError('ERRO DE CONEXÃO COM SERVIDOR. TENTE NOVAMENTE.');
+      return;
+    }
+
     setIsRegistering(true);
     try {
       console.log("Iniciando registro para:", formData.email);
@@ -94,7 +100,7 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
         state: formData.state,
         weight: parseFloat(formData.weight),
         height: parseFloat(formData.height),
-        age: 25,
+        age: calculateAge(formData.birthDate),
         gender: formData.gender,
         goal: 'maintain',
         activityLevel: 1.2,
@@ -125,7 +131,7 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-dark-bg p-8 pt-12 relative overflow-hidden">
+    <div className="min-h-screen bg-dark-bg p-8 pt-12 pb-40 relative overflow-y-auto no-scrollbar">
       {/* Background Decorative Glows */}
       <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-vibrant-orange/5 blur-[120px] rounded-full pointer-events-none" />
 
@@ -192,7 +198,7 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
                             : 'glass border-white/5 text-white/10'
                         )}
                       >
-                        {g === 'male' ? 'H' : g === 'female' ? 'M' : 'O'}
+                        {g === 'male' ? 'Homem' : g === 'female' ? 'Mulher' : 'Outro'}
                       </button>
                     ))}
                   </div>
@@ -281,7 +287,7 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
         </motion.div>
       </AnimatePresence>
 
-      <div className="fixed bottom-12 left-0 right-0 px-8 z-30">
+      <div className="fixed bottom-0 left-0 right-0 p-8 pb-10 z-30 bg-gradient-to-t from-dark-bg via-dark-bg/95 to-transparent">
         <div className="max-w-sm mx-auto">
           {step < 3 ? (
             <Button variant="premium" size="xl" onClick={nextStep} className="w-full h-18 rounded-[2.5rem] shadow-glow text-lg">
@@ -311,9 +317,9 @@ export const Register: React.FC<RegisterProps> = ({ onBack }) => {
             initial={{ opacity: 0, y: 50, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.9 }}
-            className="fixed bottom-36 left-8 right-8 p-5 glass border-red-500/20 text-red-500 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] z-40 max-w-sm mx-auto flex items-center gap-3"
+            className="fixed bottom-36 left-8 right-8 p-5 glass border-red-500/20 text-red-500 rounded-[2rem] text-[11px] font-bold uppercase tracking-[0.1em] z-40 max-w-sm mx-auto flex items-center gap-3 shadow-2xl"
           >
-            <Lock size={18} />
+            {error.includes('CONEXÃO') ? <AlertTriangle size={18} /> : <Lock size={18} />}
             {error}
           </motion.div>
         )}
@@ -339,7 +345,7 @@ const InputWithIcon: React.FC<{
       <input
         type={type}
         placeholder={placeholder}
-        className="w-full pl-16 pr-6 py-6 glass rounded-[2rem] border-white/5 focus:border-vibrant-orange/30 outline-none transition-all font-black text-white placeholder:text-white/5 tracking-wide"
+        className="w-full pl-16 pr-6 py-6 glass rounded-[2rem] border-white/10 focus:border-vibrant-orange/50 outline-none transition-all font-bold text-white placeholder:text-white/30 tracking-wide text-base shadow-inner"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
