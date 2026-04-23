@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { Card, SectionTitle, Button } from '../components/UI';
@@ -11,13 +11,26 @@ import { cn } from '../lib/utils';
 
 import { useGamification } from '../hooks/useGamification';
 
-export const Nutrition: React.FC = () => {
+export const Nutrition: React.FC<{ action?: string | null, onActionHandled?: () => void }> = ({ action, onActionHandled }) => {
   const { addXP, updateStats } = useGamification();
   const { profile } = useUser();
+  const mealInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  
   const today = startOfDay(new Date()).toISOString();
   const meals = useLiveQuery(() => db.meals.where('date').equals(today).toArray());
   const allMeals = useLiveQuery(() => db.meals.toArray());
   const waterHistory = useLiveQuery(() => db.waterLogs.where('date').equals(today).toArray());
+
+  useEffect(() => {
+    if (action === 'add-meal') {
+      setTimeout(() => {
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        mealInputRef.current?.focus();
+        onActionHandled?.();
+      }, 300);
+    }
+  }, [action, onActionHandled]);
 
   const [mealName, setMealName] = useState('');
   const [calories, setCalories] = useState('');
@@ -183,24 +196,26 @@ export const Nutrition: React.FC = () => {
       )}
 
       {/* Refined Meal Log Form */}
-      <Card variant="solid" className="relative group p-8 md:p-10 bg-dark-surface shadow-premium">
-         <div className="flex items-center gap-4 mb-12">
-            <div className="h-11 w-11 bg-vibrant-orange/10 border border-vibrant-orange/5 rounded-xl flex items-center justify-center text-vibrant-orange">
-              <Beef size={22} fill="currentColor" className="opacity-40" />
-            </div>
-            <h3 className="font-bold text-xl tracking-tight text-premium">Registrar Nutrição</h3>
-         </div>
-         <form onSubmit={addMeal} className="space-y-8">
-            <div>
-              <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] ml-1 mb-3 block opacity-50">Nome do Alimento / Refeição</label>
-              <input
-                type="text"
-                placeholder="Ex: Peito de Frango + Batata Doce"
-                className="w-full px-6 py-4.5 bg-white/[0.015] rounded-xl border border-white/[0.04] focus:border-vibrant-orange/20 transition-all outline-none text-white font-semibold placeholder:text-muted-text/20"
-                value={mealName}
-                onChange={(e) => setMealName(e.target.value)}
-              />
-            </div>
+      <div ref={formRef}>
+        <Card variant="solid" className="relative group p-8 md:p-10 bg-dark-surface shadow-premium">
+           <div className="flex items-center gap-4 mb-12">
+              <div className="h-11 w-11 bg-vibrant-orange/10 border border-vibrant-orange/5 rounded-xl flex items-center justify-center text-vibrant-orange">
+                <Beef size={22} fill="currentColor" className="opacity-40" />
+              </div>
+              <h3 className="font-bold text-xl tracking-tight text-premium">Registrar Nutrição</h3>
+           </div>
+           <form onSubmit={addMeal} className="space-y-8">
+              <div>
+                <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] ml-1 mb-3 block opacity-50">Nome do Alimento / Refeição</label>
+                <input
+                  ref={mealInputRef}
+                  type="text"
+                  placeholder="Ex: Peito de Frango + Batata Doce"
+                  className="w-full px-6 py-4.5 bg-white/[0.015] rounded-xl border border-white/[0.04] focus:border-vibrant-orange/20 transition-all outline-none text-white font-semibold placeholder:text-muted-text/20"
+                  value={mealName}
+                  onChange={(e) => setMealName(e.target.value)}
+                />
+              </div>
 
             <div className="grid grid-cols-2 gap-6">
               <div>
@@ -253,6 +268,7 @@ export const Nutrition: React.FC = () => {
             </Button>
          </form>
       </Card>
+      </div>
 
       {/* History List */}
       <div className="space-y-6">

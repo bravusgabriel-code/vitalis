@@ -32,7 +32,7 @@ import {
 import { XPProgress } from '../components/gamification/GamificationUI';
 import { getXPForLevel } from '../lib/gamification';
 
-export const Dashboard: React.FC = () => {
+export const Dashboard: React.FC<{ onNavigate?: (page: string, action?: string) => void }> = ({ onNavigate }) => {
   const { profile } = useUser();
   const today = startOfDay(new Date()).toISOString();
   
@@ -157,7 +157,11 @@ export const Dashboard: React.FC = () => {
             </div>
             
             <div className="flex gap-4">
-              <Button size="md" className="flex-1 font-bold tracking-widest uppercase text-[10px]">
+              <Button 
+                size="md" 
+                className="flex-1 font-bold tracking-widest uppercase text-[10px]"
+                onClick={() => onNavigate?.('nutrition', 'add-meal')}
+              >
                 Registrar Refeição
               </Button>
               <Button variant="secondary" size="md" className="flex-1 font-bold tracking-widest uppercase text-[10px]">

@@ -33,6 +33,7 @@ export default function App() {
   const { profile, isLoading } = useUser();
   const { showLevelUp, setShowLevelUp, newLevel, updateStats } = useGamification();
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  const [nutritionAction, setNutritionAction] = useState<string | null>(null);
   const [authState, setAuthState] = useState<AuthState>('welcome');
 
   useEffect(() => {
@@ -189,13 +190,25 @@ export default function App() {
               >
                 {(() => {
                   switch (currentPage) {
-                    case 'dashboard': return <Dashboard />;
-                    case 'nutrition': return <Nutrition />;
+                    case 'dashboard': return (
+                      <Dashboard 
+                        onNavigate={(page, action) => {
+                          setCurrentPage(page as Page);
+                          if (action) setNutritionAction(action);
+                        }} 
+                      />
+                    );
+                    case 'nutrition': return (
+                      <Nutrition 
+                        action={nutritionAction} 
+                        onActionHandled={() => setNutritionAction(null)} 
+                      />
+                    );
                     case 'workouts': return <Workouts />;
                     case 'planner': return <Planner />;
                     case 'gamification': return <Gamification />;
                     case 'profile': return <Profile />;
-                    default: return <Dashboard />;
+                    default: return <Dashboard onNavigate={(page) => setCurrentPage(page as Page)} />;
                   }
                 })()}
               </motion.div>
