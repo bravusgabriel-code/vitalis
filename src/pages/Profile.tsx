@@ -5,6 +5,8 @@ import { User, Scale, Ruler, Settings, Award, Camera, Zap, LogOut, CheckCircle2,
 import { UserProfile, GoalType } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getStatusRank } from '../lib/gamification';
+import { GOAL_OPTIONS, ACTIVITY_LEVELS, getCalorieStrategies } from '../services/goalEngine';
+import { calculateTDEE, generateFullPlan } from '../services/metabolicService';
 
 export const Profile: React.FC = () => {
   const { profile, updateProfile, logout } = useUser();
@@ -37,32 +39,16 @@ export const Profile: React.FC = () => {
     if (profile) setFormData(profile);
   }, [profile]);
 
-  const calculateTDEE = (data: UserProfile) => {
-    let bmr = 0;
-    if (data.gender === 'male') {
-      bmr = 88.362 + (13.397 * data.weight) + (4.799 * data.height) - (5.677 * data.age);
-    } else {
-      bmr = 447.593 + (9.247 * data.weight) + (3.098 * data.height) - (4.33 * data.age);
-    }
-    
-    const tdee = bmr * data.activityLevel;
-    
-    let target = tdee;
-    if (data.goal === 'lose') target -= 500;
-    if (data.goal === 'gain') target += 300;
-    
-    return Math.round(target);
-  };
-
   const handleSave = async () => {
-    const targetCalories = calculateTDEE(formData);
-    const updated = { ...formData, targetCalories };
-    await updateProfile(updated);
+    const updatedPlan = generateFullPlan(formData);
+    await updateProfile({ ...formData, ...updatedPlan });
     setIsSuccessfullySaved(true);
     setTimeout(() => setIsSuccessfullySaved(false), 3000);
   };
 
   const firstName = formData.name?.split(' ')[0] || 'Atleta';
+
+  const strategies = getCalorieStrategies(formData.goal || 'maintain');
 
   return (
     <div className="space-y-10 pb-10">
@@ -110,7 +96,7 @@ export const Profile: React.FC = () => {
               <div className="flex items-baseline gap-1">
                  <input 
                    type="number" 
-                   value={formData.weight}
+                   value={formData.weight || ''}
                    onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) })}
                    className="w-24 bg-transparent text-4xl font-bold text-center outline-none tabular-nums text-white tracking-tighter"
                  />
@@ -124,7 +110,7 @@ export const Profile: React.FC = () => {
               <div className="flex items-baseline gap-1">
                  <input 
                    type="number" 
-                   value={formData.height}
+                   value={formData.height || ''}
                    onChange={(e) => setFormData({ ...formData, height: parseInt(e.target.value) })}
                    className="w-24 bg-transparent text-4xl font-bold text-center outline-none tabular-nums text-white tracking-tighter"
                  />
@@ -146,7 +132,7 @@ export const Profile: React.FC = () => {
               <input
                 type="text"
                 className="w-full px-6 py-4.5 bg-white/[0.015] rounded-xl border border-white/[0.04] focus:border-vibrant-orange/20 transition-all outline-none font-semibold text-white tracking-wide"
-                value={formData.name}
+                value={formData.name || ''}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
             </div>
@@ -157,7 +143,7 @@ export const Profile: React.FC = () => {
                 <input
                   type="number"
                   className="w-full px-6 py-4.5 bg-white/[0.015] rounded-xl border border-white/[0.04] focus:border-vibrant-orange/20 transition-all outline-none font-bold text-xl text-center text-white"
-                  value={formData.age}
+                  value={formData.age || ''}
                   onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) })}
                 />
               </div>
@@ -165,7 +151,7 @@ export const Profile: React.FC = () => {
                 <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] ml-1 mb-3.5 block opacity-50">Gênero Bio</label>
                 <select
                   className="w-full px-6 py-[21px] bg-white/[0.015] rounded-xl border border-white/[0.04] focus:border-vibrant-orange/20 transition-all outline-none appearance-none font-bold text-[11px] uppercase tracking-[1.5px] text-center cursor-pointer text-white"
-                  value={formData.gender}
+                  value={formData.gender || 'male'}
                   onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
                 >
                   <option value="male">Masculino</option>
@@ -179,12 +165,25 @@ export const Profile: React.FC = () => {
               <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] ml-1 block text-center opacity-50">Diretriz de Composição</label>
               <select
                 className="w-full px-6 py-[21px] bg-vibrant-orange/5 rounded-xl border border-vibrant-orange/10 focus:border-vibrant-orange/20 transition-all outline-none appearance-none font-bold text-[11px] uppercase tracking-[1.5px] text-center text-vibrant-orange cursor-pointer"
-                value={formData.goal}
+                value={formData.goal || 'maintain'}
                 onChange={(e) => setFormData({ ...formData, goal: e.target.value as GoalType })}
               >
-                <option value="lose">PERDER PESO (CUTTING)</option>
-                <option value="maintain">MANUTENÇÃO (RECOMP)</option>
-                <option value="gain">GANHAR MÚSCULO (BULKING)</option>
+                {GOAL_OPTIONS.map(opt => (
+                  <option key={opt.id} value={opt.id}>{opt.label.toUpperCase()} ({opt.id})</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-4">
+              <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] ml-1 block text-center opacity-50">Estratégia Calórica</label>
+              <select
+                className="w-full px-6 py-[21px] bg-white/[0.015] rounded-xl border border-white/[0.04] focus:border-vibrant-orange/20 transition-all outline-none appearance-none font-bold text-[10px] uppercase tracking-[1.5px] text-center cursor-pointer text-white"
+                value={formData.calorieStrategy || 'maintain'}
+                onChange={(e) => setFormData({ ...formData, calorieStrategy: e.target.value as any })}
+              >
+                {strategies.map(s => (
+                  <option key={s.id} value={s.id}>{s.label.toUpperCase()}</option>
+                ))}
               </select>
             </div>
 
@@ -192,36 +191,42 @@ export const Profile: React.FC = () => {
               <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] ml-1 block opacity-50">Nível Metabólico (Atividade)</label>
               <select
                 className="w-full px-6 py-[21px] bg-white/[0.015] rounded-xl border border-white/[0.04] focus:border-vibrant-orange/20 transition-all outline-none appearance-none font-bold text-[10px] uppercase tracking-[1.5px] text-center cursor-pointer text-white"
-                value={formData.activityLevel}
+                value={formData.activityLevel || 1.2}
                 onChange={(e) => setFormData({ ...formData, activityLevel: parseFloat(e.target.value) })}
               >
-                <option value={1.2}>Sedentário (Trabalho de escritório)</option>
-                <option value={1.375}>Leve (Treino 1-3 dias)</option>
-                <option value={1.55}>Moderado (Treino 3-5 dias)</option>
-                <option value={1.725}>Intenso (Treino 6-7 dias)</option>
-                <option value={1.9}>Elite (Treino Pesado Diário)</option>
+                {ACTIVITY_LEVELS.map(level => (
+                  <option key={level.value} value={level.value}>{level.label.toUpperCase()} ({level.value}x)</option>
+                ))}
               </select>
             </div>
             
             <div className="pt-10 border-t border-white/[0.04]">
+               <div className="text-center space-y-3.5 mb-10">
+                <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] block opacity-40">Meta Hídrica (ml)</label>
+                <input
+                  type="number"
+                  className="w-full px-4 py-4 bg-white/[0.015] rounded-xl border border-white/[0.04] outline-none font-bold text-center text-vibrant-orange tabular-nums"
+                  value={formData.waterGoal || 2500}
+                  onChange={(e) => setFormData({ ...formData, waterGoal: parseInt(e.target.value) })}
+                />
+              </div>
                <div className="grid grid-cols-2 gap-6">
                   <div className="text-center space-y-3.5">
-                    <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] block opacity-40">Meta Hídrica (ml)</label>
+                    <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] block opacity-40">BMR (Metabolismo Basal)</label>
                     <input
                       type="number"
                       className="w-full px-4 py-4 bg-white/[0.015] rounded-xl border border-white/[0.04] outline-none font-bold text-center text-vibrant-orange tabular-nums"
-                      value={formData.waterGoal}
-                      onChange={(e) => setFormData({ ...formData, waterGoal: parseInt(e.target.value) })}
+                      value={formData.bmr || ''}
+                      onChange={(e) => setFormData({ ...formData, bmr: parseInt(e.target.value) })}
                     />
                   </div>
                   <div className="text-center space-y-3.5">
-                    <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] block opacity-40">Calorias Custom</label>
+                    <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] block opacity-40">Calorias Sugeridas</label>
                     <input
                       type="number"
-                      placeholder={`Calc: ${calculateTDEE(formData)}`}
-                      className="w-full px-4 py-4 bg-white/[0.015] rounded-xl border border-white/[0.04] outline-none font-bold text-center text-white tabular-nums opacity-60 focus:opacity-100 transition-opacity"
-                      value={formData.manualCalories || ''}
-                      onChange={(e) => setFormData({ ...formData, manualCalories: e.target.value ? parseInt(e.target.value) : undefined })}
+                      disabled
+                      className="w-full px-4 py-4 bg-white/[0.015] rounded-xl border border-white/[0.04] outline-none font-bold text-center text-white tabular-nums opacity-40 cursor-not-allowed"
+                      value={formData.targetCalories || 0}
                     />
                   </div>
                </div>

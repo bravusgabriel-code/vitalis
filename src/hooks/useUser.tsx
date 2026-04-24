@@ -4,6 +4,13 @@ import { db } from '../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
+import { getAgeFromBirthDate } from '../lib/fitnessUtils';
+import { 
+  calculateBMR, 
+  calculateTDEE, 
+  getCalorieTarget, 
+  calculateMacros 
+} from '../services/metabolicService';
 
 interface UserContextType {
   profile: UserProfile | undefined;
@@ -42,8 +49,41 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfile = async (changes: Partial<UserProfile>) => {
     const existing = await db.userProfile.toCollection().first();
-    const updated = existing ? { ...existing, ...changes } : changes as UserProfile;
+    let updated = existing ? { ...existing, ...changes } : changes as UserProfile;
     
+    // Recalcular TDEE e Macros se dados físicos ou objetivos mudarem
+    if (
+      changes.weight || changes.height || changes.birthDate || 
+      changes.gender || changes.activityLevel || changes.goal || changes.calorieStrategy
+    ) {
+      const weight = changes.weight || existing?.weight || 0;
+      const height = changes.height || existing?.height || 0;
+      const birthDate = changes.birthDate || existing?.birthDate || '';
+      const gender = changes.gender || existing?.gender || 'other';
+      const activityLevel = changes.activityLevel || existing?.activityLevel || 1.2;
+      const goal = changes.goal || existing?.goal || 'maintain';
+      const strategy = changes.calorieStrategy || existing?.calorieStrategy || 'maintain';
+      
+      const age = getAgeFromBirthDate(birthDate);
+      const bmr = calculateBMR(weight, height, age, gender);
+      const tdee = calculateTDEE(bmr, activityLevel);
+      const targetCalories = getCalorieTarget(tdee, strategy);
+      const macros = calculateMacros(targetCalories, weight, goal, strategy);
+      
+      const calculatedChanges = {
+        bmr,
+        tdee,
+        targetCalories,
+        targetProtein: macros.protein,
+        targetCarbs: macros.carbs,
+        targetFat: macros.fat,
+        age
+      };
+
+      updated = { ...updated, ...calculatedChanges };
+      Object.assign(changes, calculatedChanges);
+    }
+
     if (existing?.id) {
       await db.userProfile.update(existing.id, changes);
     } else if (updated.name) {
@@ -57,20 +97,60 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updated_at: new Date().toISOString()
       };
 
-      if (changes.name) supabaseChanges.nome = changes.name;
+      // Basic mapping - using same names now where possible
+      if (changes.name) supabaseChanges.name = changes.name;
       if (changes.email) supabaseChanges.email = changes.email;
-      if (changes.birthDate) supabaseChanges.data_nascimento = changes.birthDate;
-      if (changes.city) supabaseChanges.cidade = changes.city;
-      if (changes.state) supabaseChanges.estado = changes.state;
-      if (changes.weight) supabaseChanges.peso = changes.weight;
-      if (changes.height) supabaseChanges.altura = changes.height;
-      if (changes.gender) supabaseChanges.genero = changes.gender;
+      if (changes.birthDate) supabaseChanges.birth_date = changes.birthDate;
+      if (changes.city) supabaseChanges.city = changes.city;
+      if (changes.state) supabaseChanges.state = changes.state;
+      if (changes.weight) supabaseChanges.weight = changes.weight;
+      if (changes.height) supabaseChanges.height = changes.height;
+      if (changes.gender) supabaseChanges.gender = changes.gender;
+      if (changes.age) supabaseChanges.age = changes.age;
+      
+      // Activity and Goals
+      if (changes.activityLevel) {
+        supabaseChanges.activity_multiplier = changes.activityLevel;
+        // Map multiplier to text label
+        if (changes.activityLevel <= 1.2) supabaseChanges.activity_level = 'sedentary';
+        else if (changes.activityLevel <= 1.375) supabaseChanges.activity_level = 'light';
+        else if (changes.activityLevel <= 1.55) supabaseChanges.activity_level = 'moderate';
+        else if (changes.activityLevel <= 1.725) supabaseChanges.activity_level = 'active';
+        else supabaseChanges.activity_level = 'very_active';
+      }
+      
+      if (changes.goal) supabaseChanges.goal_type = changes.goal;
+      if (changes.goalValue) supabaseChanges.goal_value = changes.goalValue;
+      if (changes.goalTargetWeight) supabaseChanges.goal_target_weight = changes.goalTargetWeight;
+      if (changes.goalDeadline) supabaseChanges.goal_deadline = changes.goalDeadline;
+      if (changes.calorieStrategy) supabaseChanges.calorie_strategy = changes.calorieStrategy;
+      
+      // Metabolic fields
+      if (changes.bmr !== undefined) supabaseChanges.bmr = changes.bmr;
+      if (changes.tdee !== undefined) supabaseChanges.tdee = changes.tdee;
+      if (changes.targetCalories !== undefined) supabaseChanges.target_calories = changes.targetCalories;
+      if (changes.targetDeficit !== undefined) supabaseChanges.target_deficit = changes.targetDeficit;
+      if (changes.targetProtein !== undefined) supabaseChanges.target_protein = changes.targetProtein;
+      if (changes.targetCarbs !== undefined) supabaseChanges.target_carbs = changes.targetCarbs;
+      if (changes.targetFat !== undefined) supabaseChanges.target_fat = changes.targetFat;
+      if (changes.targetBalance !== undefined) supabaseChanges.target_balance = changes.targetBalance;
+      
+      // App Specific
+      if (changes.waterGoal !== undefined) supabaseChanges.water_goal = changes.waterGoal;
       if (changes.hasDoctor !== undefined) supabaseChanges.has_doctor = changes.hasDoctor;
       if (changes.doctorName !== undefined) supabaseChanges.doctor_name = changes.doctorName;
       if (changes.doctorId !== undefined) supabaseChanges.doctor_id = changes.doctorId;
       if (changes.xp !== undefined) supabaseChanges.xp = changes.xp;
-      if (changes.level !== undefined) supabaseChanges.nivel = changes.level;
+      if (changes.level !== undefined) supabaseChanges.level = changes.level;
       if (changes.streak !== undefined) supabaseChanges.streak = changes.streak;
+      if (changes.achievements) supabaseChanges.achievements = changes.achievements;
+      if (changes.totalWeightLifted !== undefined) supabaseChanges.total_weight_lifted = changes.totalWeightLifted;
+      if (changes.totalCardioDistance !== undefined) supabaseChanges.total_cardio_distance = changes.totalCardioDistance;
+      if (changes.waterDaysCount !== undefined) supabaseChanges.water_days_count = changes.waterDaysCount;
+      if (changes.nutritionDaysCount !== undefined) supabaseChanges.nutrition_days_count = changes.nutritionDaysCount;
+      if (changes.missionsCompletedCount !== undefined) supabaseChanges.missions_completed_count = changes.missionsCompletedCount;
+      if (changes.appUsageDaysCount !== undefined) supabaseChanges.app_usage_days_count = changes.appUsageDaysCount;
+      if (changes.lastActiveDate) supabaseChanges.last_active_date = changes.lastActiveDate;
 
       try {
         await supabase.from('profiles').upsert(supabaseChanges);
@@ -99,20 +179,53 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
       
       if (profileData) {
-        // Map snake_case from DB to camelCase in App
+        // Direct mapping now that we unified field names
         const mappedProfile: UserProfile = {
           ...profileData,
-          name: profileData.nome,
-          birthDate: profileData.data_nascimento,
-          city: profileData.cidade,
-          state: profileData.estado,
-          weight: profileData.peso,
-          height: profileData.altura,
-          gender: profileData.genero,
+          name: profileData.name || profileData.nome, // Fallback for transition
+          email: profileData.email,
+          cpf: profileData.cpf,
+          birthDate: profileData.birth_date || profileData.data_nascimento,
+          city: profileData.city || profileData.cidade,
+          state: profileData.state || profileData.estado,
+          weight: profileData.weight || profileData.peso,
+          height: profileData.height || profileData.altura,
+          age: profileData.age || profileData.idade || getAgeFromBirthDate(profileData.birth_date || profileData.data_nascimento),
+          gender: profileData.gender || profileData.genero,
+          goal: profileData.goal_type || profileData.goal || 'maintain',
+          activityLevel: profileData.activity_multiplier || profileData.activity_level || 1.2,
+          waterGoal: profileData.water_goal || 2500,
+          
+          bmr: profileData.bmr,
+          tdee: profileData.tdee,
+          targetCalories: profileData.target_calories,
+          targetProtein: profileData.target_protein,
+          targetCarbs: profileData.target_carbs,
+          targetFat: profileData.target_fat,
+          targetDeficit: profileData.target_deficit,
+          targetBalance: profileData.target_balance,
+          
+          goalValue: profileData.goal_value,
+          goalTargetWeight: profileData.goal_target_weight,
+          goalDeadline: profileData.goal_deadline,
+          calorieStrategy: profileData.calorie_strategy,
+          
           hasDoctor: profileData.has_doctor,
           doctorName: profileData.doctor_name,
           doctorId: profileData.doctor_id,
-          level: profileData.nivel,
+          
+          xp: profileData.xp || 0,
+          level: profileData.level || profileData.nivel || 1,
+          streak: profileData.streak || 0,
+          achievements: profileData.achievements || [],
+          totalWeightLifted: profileData.total_weight_lifted || 0,
+          totalCardioDistance: profileData.total_cardio_distance || 0,
+          waterDaysCount: profileData.water_days_count || 0,
+          nutritionDaysCount: profileData.nutrition_days_count || 0,
+          missionsCompletedCount: profileData.missions_completed_count || 0,
+          appUsageDaysCount: profileData.app_usage_days_count || 0,
+          lastActiveDate: profileData.last_active_date,
+          
           isAuthenticated: true
         };
         await db.userProfile.clear();
@@ -156,9 +269,23 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (data.user) {
       console.log("Usuário criado no Auth. ID:", data.user.id);
+      
+      const age = getAgeFromBirthDate(newProfile.birthDate);
+      const bmr = calculateBMR(newProfile.weight, newProfile.height, age, newProfile.gender);
+      const tdee = calculateTDEE(bmr, newProfile.activityLevel);
+      const targetCalories = getCalorieTarget(tdee, newProfile.calorieStrategy || 'maintain');
+      const macros = calculateMacros(targetCalories, newProfile.weight, newProfile.goal);
+
       const profileToSave = { 
         ...newProfile, 
         id: data.user.id,
+        age,
+        bmr,
+        tdee,
+        targetCalories,
+        targetProtein: macros.protein,
+        targetCarbs: macros.carbs,
+        targetFat: macros.fat,
         isAuthenticated: true 
       };
       delete (profileToSave as any).password; // Don't store password in public table
@@ -171,22 +298,52 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const supabaseUpdate: any = {
           id: data.user.id,
-          nome: profileToSave.name,
+          name: profileToSave.name,
           email: profileToSave.email,
           cpf: profileToSave.cpf,
-          data_nascimento: profileToSave.birthDate || null,
-          cidade: profileToSave.city || null,
-          estado: profileToSave.state || null,
-          peso: profileToSave.weight || null,
-          altura: profileToSave.height || null,
-          genero: profileToSave.gender || null,
+          age: profileToSave.age,
+          gender: profileToSave.gender,
+          weight: profileToSave.weight,
+          height: profileToSave.height,
+          
+          birth_date: profileToSave.birthDate || null,
+          city: profileToSave.city || null,
+          state: profileToSave.state || null,
+          
+          activity_multiplier: profileToSave.activityLevel,
+          goal_type: profileToSave.goal,
+          goal_value: profileToSave.goalValue || 0,
+          goal_target_weight: profileToSave.goalTargetWeight || profileToSave.goalWeight || 0,
+          goal_deadline: profileToSave.goalDeadline || null,
+          calorie_strategy: profileToSave.calorieStrategy || 'maintain',
+          
+          bmr: profileToSave.bmr || 0,
+          tdee: profileToSave.tdee || 0,
+          target_calories: profileToSave.targetCalories || 0,
+          target_deficit: profileToSave.targetDeficit || 0,
+          target_protein: profileToSave.targetProtein || 0,
+          target_carbs: profileToSave.targetCarbs || 0,
+          target_fat: profileToSave.targetFat || 0,
+          target_balance: profileToSave.targetBalance || 0,
+          
+          water_goal: profileToSave.waterGoal || 2500,
+          xp: profileToSave.xp || 0,
+          level: profileToSave.level || 1,
+          streak: profileToSave.streak || 0,
+          achievements: profileToSave.achievements || [],
+          
           has_doctor: profileToSave.hasDoctor || false,
           doctor_name: profileToSave.doctorName || null,
-          xp: profileToSave.xp || 0,
-          nivel: profileToSave.level || 1,
-          streak: profileToSave.streak || 0,
+          
           updated_at: new Date().toISOString()
         };
+
+        // Activity level text mapping
+        if (profileToSave.activityLevel <= 1.2) supabaseUpdate.activity_level = 'sedentary';
+        else if (profileToSave.activityLevel <= 1.375) supabaseUpdate.activity_level = 'light';
+        else if (profileToSave.activityLevel <= 1.55) supabaseUpdate.activity_level = 'moderate';
+        else if (profileToSave.activityLevel <= 1.725) supabaseUpdate.activity_level = 'active';
+        else supabaseUpdate.activity_level = 'very_active';
 
         // Only add doctor_id if it's a valid non-empty string
         if (profileToSave.doctorId && profileToSave.doctorId.trim() !== '') {

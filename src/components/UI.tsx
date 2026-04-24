@@ -13,11 +13,11 @@ export const Card: React.FC<CardProps> = ({ children, className, variant = 'glas
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        "rounded-[16px] transition-all duration-300",
-        variant === 'glass' && "glass bg-white/[0.015] border-white/[0.03] shadow-premium",
-        variant === 'solid' && "bg-dark-surface border border-white/[0.04] shadow-premium",
-        variant === 'outline' && "bg-transparent border border-white/[0.06]",
-        "p-6 md:p-8",
+        "rounded-[28px] transition-all duration-400",
+        variant === 'glass' && "bg-gradient-to-br from-white/[0.04] to-transparent border border-white/[0.05] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] backdrop-blur-xl",
+        variant === 'solid' && "bg-[#0A0A0A] border border-white/[0.04] shadow-[0_15px_50px_-12px_rgba(0,0,0,0.7)]",
+        variant === 'outline' && "bg-transparent border border-white/[0.06] hover:border-white/[0.1] transition-colors",
+        "p-6 md:p-10",
         className
       )} 
       {...props}

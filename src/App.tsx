@@ -10,6 +10,7 @@ import { VitalisAI } from './components/VitalisAI';
 import { Welcome } from './pages/auth/Welcome';
 import { Login } from './pages/auth/Login';
 import { Register } from './pages/auth/Register';
+import { Onboarding } from './pages/Onboarding';
 import { 
   Home, 
   Utensils, 
@@ -35,6 +36,15 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [nutritionAction, setNutritionAction] = useState<string | null>(null);
   const [authState, setAuthState] = useState<AuthState>('welcome');
+  const [isOnboarding, setIsOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (profile && profile.isAuthenticated && !profile.bmr) {
+      setIsOnboarding(true);
+    } else {
+      setIsOnboarding(false);
+    }
+  }, [profile?.isAuthenticated, profile?.bmr]);
 
   useEffect(() => {
     seedDatabase();
@@ -87,6 +97,19 @@ export default function App() {
           )}
         </AnimatePresence>
       </div>
+    );
+  }
+
+  // FORCE ONBOARDING if profile incomplete
+  if (isOnboarding) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }}
+        className="min-h-screen bg-dark-bg"
+      >
+        <Onboarding onComplete={() => setIsOnboarding(false)} />
+      </motion.div>
     );
   }
 

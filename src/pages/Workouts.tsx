@@ -21,15 +21,26 @@ import {
   CheckCircle2,
   Copy
 } from 'lucide-react';
-import { calculateCaloriesBurned, calculatePace } from '../lib/utils';
+import { calculatePace, calculateAge } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
+import { calculateWorkoutCalories, WorkoutIntensity } from '../services/workoutCalorieService';
+import { useUser } from '../hooks/useUser';
 
 import { useGamification } from '../hooks/useGamification';
 
 export const Workouts: React.FC = () => {
+  const { profile } = useUser();
   const { updateStats } = useGamification();
   const today = startOfDay(new Date()).toISOString();
+  
+  // Strength states
+  const [strengthDuration, setStrengthDuration] = useState('60');
+  const [strengthIntensity, setStrengthIntensity] = useState<WorkoutIntensity>('moderate');
+
+  // Cardio states 
+  const [cardioIntensity, setCardioIntensity] = useState<WorkoutIntensity>('moderate');
+
   const strengthWorkouts = useLiveQuery(() => 
     db.workouts
       .where('date')
@@ -78,15 +89,24 @@ export const Workouts: React.FC = () => {
 
   const logCardio = async () => {
     if (!distance || !minutes) return;
-    const durationSeconds = parseInt(minutes) * 60;
+    const durationMinutes = parseInt(minutes);
+    const durationSeconds = durationMinutes * 60;
     const distanceKm = parseFloat(distance);
+    
+    const calories = calculateWorkoutCalories(
+      'cardio',
+      cardioIntensity,
+      profile?.weight || 70,
+      durationMinutes
+    );
     
     await db.cardioLogs.add({
       date: today,
       type: cardioType,
       distance: distanceKm,
-      duration: durationSeconds,
-      calories: calculateCaloriesBurned(cardioType, distanceKm, durationSeconds),
+      duration: durationMinutes,
+      intensity: cardioIntensity,
+      calories: calories,
       pace: calculatePace(distanceKm, durationSeconds),
       notes: cardioNotes
     });
@@ -116,6 +136,14 @@ export const Workouts: React.FC = () => {
       setPlannedName('');
     } else {
       const existing = strengthWorkouts?.[0];
+      const durationNum = parseInt(strengthDuration) || 0;
+      const calories = calculateWorkoutCalories(
+        'strength',
+        strengthIntensity,
+        profile?.weight || 70,
+        durationNum
+      );
+
       if (existing && existing.id) {
         const newExercises = [...existing.exercises];
         const exIndex = newExercises.findIndex(e => e.exerciseId === selectedEx);
@@ -124,10 +152,21 @@ export const Workouts: React.FC = () => {
         } else {
           newExercises.push({ exerciseId: selectedEx, sets: validSets });
         }
-        await db.workouts.update(existing.id, { exercises: newExercises });
+        
+        // Re-calculate or add up calories if session keeps growing?
+        // User asked for "Gasto com treino (hoje)". Usually sessions are grouped by day.
+        await db.workouts.update(existing.id, { 
+          exercises: newExercises,
+          duration: (existing.duration || 0) + durationNum,
+          caloriesBurned: (existing.caloriesBurned || 0) + calories
+        });
       } else {
         await db.workouts.add({
           date: today,
+          duration: durationNum,
+          intensity: strengthIntensity,
+          caloriesBurned: calories,
+          type: 'strength',
           exercises: [{ exerciseId: selectedEx, sets: validSets }]
         });
       }
@@ -222,6 +261,30 @@ export const Workouts: React.FC = () => {
               </div>
               
               <div className="space-y-10">
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] ml-1 mb-3.5 block opacity-50">Duração (minutos)</label>
+                    <input 
+                      type="number"
+                      className="w-full px-6 py-[18px] bg-white/[0.015] rounded-xl border border-white/[0.04] focus:border-vibrant-orange/20 transition-all outline-none font-bold text-center tabular-nums text-white"
+                      value={strengthDuration}
+                      onChange={(e) => setStrengthDuration(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] ml-1 mb-3.5 block opacity-50">Intensidade</label>
+                    <select 
+                      className="w-full px-6 py-[18px] bg-white/[0.015] rounded-xl border border-white/[0.04] focus:border-vibrant-orange/20 transition-all outline-none font-bold text-[10px] uppercase tracking-[1.5px] cursor-pointer text-white text-center"
+                      value={strengthIntensity}
+                      onChange={(e) => setStrengthIntensity(e.target.value as any)}
+                    >
+                      <option value="low">Baixa (3.5 MET)</option>
+                      <option value="moderate">Moderada (5.0 MET)</option>
+                      <option value="intense">Alta (7.0 MET)</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div>
                    <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] ml-1 mb-3.5 block opacity-50">Exercício Selecionado</label>
                    <select 
@@ -319,6 +382,19 @@ export const Workouts: React.FC = () => {
                             <div className="flex justify-between items-start mb-8">
                               <div>
                                 <span className="text-[9px] font-bold text-vibrant-orange uppercase tracking-[.2em] bg-vibrant-orange/10 px-3 py-1.5 rounded-lg mb-3 inline-block border border-vibrant-orange/10 shadow-sm">VOL {totalVol} KG</span>
+                                {workout.caloriesBurned && (
+                                  <button 
+                                    onClick={() => {
+                                      const newVal = prompt("Editar calorias:", Math.round(workout.caloriesBurned || 0).toString());
+                                      if (newVal !== null && !isNaN(parseInt(newVal))) {
+                                        db.workouts.update(workout.id!, { caloriesBurned: parseInt(newVal) });
+                                      }
+                                    }}
+                                    className="ml-2 text-[9px] font-bold text-white uppercase tracking-[.2em] bg-white/5 px-3 py-1.5 rounded-lg mb-3 inline-block border border-white/5 shadow-sm hover:bg-white/10 transition-colors"
+                                  >
+                                    {Math.round(workout.caloriesBurned)} KCAL <span className="opacity-40">✎</span>
+                                  </button>
+                                )}
                                 <h4 className="text-2xl font-bold tracking-tight text-white">{exName}</h4>
                               </div>
                               <div className="text-[10px] font-bold text-muted-text opacity-30 uppercase tracking-[0.1em]">{exGroup.sets.length} SÉRIES</div>
@@ -373,6 +449,30 @@ export const Workouts: React.FC = () => {
                          )}
                        >
                          {t}
+                       </button>
+                     ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-muted-text uppercase tracking-[0.2em] ml-1 mb-4 block opacity-50">Intensidade do Esforço</label>
+                  <div className="grid grid-cols-3 gap-3">
+                     {[
+                       { id: 'low', label: 'Leve (3.5)' },
+                       { id: 'moderate', label: 'Moderada (7.0)' },
+                       { id: 'intense', label: 'Alta/HIIT (11.0)' }
+                     ].map(i => (
+                       <button
+                         key={i.id}
+                         onClick={() => setCardioIntensity(i.id as any)}
+                         className={cn(
+                           "py-4 rounded-xl text-[10px] font-bold uppercase tracking-[1.5px] border transition-all",
+                           cardioIntensity === i.id 
+                             ? 'bg-vibrant-orange/10 border-vibrant-orange/20 text-vibrant-orange shadow-lg shadow-vibrant-orange/5' 
+                             : 'bg-white/[0.015] border-white/[0.04] text-muted-text/30 hover:text-white/40'
+                         )}
+                       >
+                         {i.label}
                        </button>
                      ))}
                   </div>
@@ -452,10 +552,18 @@ export const Workouts: React.FC = () => {
                            </div>
                            <div className="flex flex-col gap-1.5">
                              <span className="text-[9px] font-bold text-muted-text uppercase tracking-widest opacity-40">Energia Burn</span>
-                             <div className="flex items-center gap-2.5">
+                             <button 
+                               onClick={() => {
+                                 const newVal = prompt("Editar calorias:", log.calories.toString());
+                                 if (newVal !== null && !isNaN(parseInt(newVal))) {
+                                   db.cardioLogs.update(log.id!, { calories: parseInt(newVal) });
+                                 }
+                               }}
+                               className="flex items-center gap-2.5 hover:bg-white/5 rounded-lg transition-colors p-1 -ml-1"
+                             >
                                <Flame size={15} className="text-vibrant-orange opacity-40" />
-                               <span className="text-[16px] font-bold text-white tabular-nums tracking-tight">{log.calories} <span className="text-[10px] font-bold text-muted-text opacity-30 uppercase tracking-[0.1em]">kcal</span></span>
-                             </div>
+                               <span className="text-[16px] font-bold text-white tabular-nums tracking-tight">{log.calories} <span className="text-[10px] font-bold text-muted-text opacity-30 uppercase tracking-[0.1em]">kcal ✎</span></span>
+                             </button>
                            </div>
                         </div>
                       </div>

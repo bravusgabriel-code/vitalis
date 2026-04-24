@@ -1,8 +1,9 @@
 import Dexie, { type Table } from 'dexie';
 import { 
   UserProfile, 
-  FoodItem, 
+  Food, 
   LoggedMeal, 
+  MealGroup,
   Exercise, 
   WorkoutSession, 
   CardioLog, 
@@ -12,7 +13,8 @@ import {
 
 export class VitalisDB extends Dexie {
   userProfile!: Table<UserProfile>;
-  foodHistory!: Table<FoodItem>;
+  foods!: Table<Food>;
+  mealGroups!: Table<MealGroup>;
   meals!: Table<LoggedMeal>;
   exercises!: Table<Exercise>;
   workouts!: Table<WorkoutSession>;
@@ -36,6 +38,32 @@ export class VitalisDB extends Dexie {
     this.version(2).stores({
       workouts: '++id, date, isPlanned'
     });
+
+    this.version(3).stores({
+      foods: '++id, name',
+      meals: '++id, date, type, foodId'
+    }).upgrade(tx => {
+      // Handle data migration if necessary
+    });
+
+    this.version(5).stores({
+      foods: '++id, &name_normalized, name',
+      mealGroups: '++id, date, userId, type, order',
+      meals: '++id, date, type, foodId, mealGroupId'
+    }).upgrade(async tx => {
+      // Data migration to normalize names for existing foods
+      const foods = await tx.table('foods').toArray();
+      const seen = new Set();
+      for (const food of foods) {
+        const normalized = food.name.trim().toLowerCase();
+        if (seen.has(normalized)) {
+          await tx.table('foods').delete(food.id);
+        } else {
+          seen.add(normalized);
+          await tx.table('foods').update(food.id, { name_normalized: normalized });
+        }
+      }
+    });
   }
 }
 
@@ -43,8 +71,8 @@ export const db = new VitalisDB();
 
 // Seed data
 export async function seedDatabase() {
-  const count = await db.exercises.count();
-  if (count === 0) {
+  const exCount = await db.exercises.count();
+  if (exCount === 0) {
     await db.exercises.bulkAdd([
       // Força
       { name: 'Supino Reto', category: 'strength' },
