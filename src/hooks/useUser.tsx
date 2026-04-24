@@ -148,6 +148,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (error) {
       console.error("Erro no signUp:", error);
+      if (error.message.includes('Database error saving new user')) {
+        throw new Error('Erro no Banco de Dados ao salvar usuário. Certifique-se de que a tabela "profiles" existe e o trigger está correto (ver SUPABASE_SETUP.sql).');
+      }
       throw error;
     }
 
