@@ -192,15 +192,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (profileToSave.doctorId && profileToSave.doctorId.trim() !== '') {
           supabaseUpdate.doctor_id = profileToSave.doctorId;
         } else {
+          // Explicitly null if empty to avoid empty string UUID error
           supabaseUpdate.doctor_id = null;
         }
 
+        console.log("DEBUG Supabase Update Object:", supabaseUpdate);
         const { error: upsertError } = await supabase.from('profiles').upsert(supabaseUpdate);
 
         if (upsertError) {
           console.error("Erro no upsert profiles:", upsertError);
-          throw new Error(`Erro ao salvar perfil: ${upsertError.message}`);
+          // If code is PGRST204 (No rows returned) or similar, it might be a policy issue
+          throw new Error(`Erro ao salvar perfil no Supabase: ${upsertError.message} (Code: ${upsertError.code})`);
         }
+        console.log("Upsert concluído com sucesso.");
       } catch (e: any) {
         console.error("Exceção no registro Supabase:", e);
         throw e;

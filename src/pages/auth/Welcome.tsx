@@ -14,6 +14,7 @@ export const Welcome: React.FC<WelcomeProps> = ({ onLogin, onRegister }) => {
   const [isConfigured, setIsConfigured] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
   const [diagInfo, setDiagInfo] = useState<string>('');
+  const [showConfigHelp, setShowConfigHelp] = useState(false);
 
   const testConnection = async () => {
     setConnectionStatus('testing');
@@ -21,23 +22,31 @@ export const Welcome: React.FC<WelcomeProps> = ({ onLogin, onRegister }) => {
       const diag = supabase.getDiagnosticInfo();
       if (!diag.isConfigured) {
         setConnectionStatus('error');
-        setDiagInfo('Chaves Supabase ausentes nos Secrets.');
+        setDiagInfo('Chaves Supabase ausentes. Configure as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.');
         return;
       }
 
-      // Test simple query to see if table exists
-      const { error } = await supabase.from('profiles').select('id').limit(1);
-      
-      if (error) {
+      // 1. Test Auth Connection
+      const { error: authError } = await supabase.auth.getSession();
+      if (authError) {
         setConnectionStatus('error');
-        if (error.message.includes('relation "public.profiles" does not exist')) {
-          setDiagInfo('Tabela "profiles" não encontrada. Execute o SQL de setup.');
+        setDiagInfo(`Erro de Auth: ${authError.message}`);
+        return;
+      }
+
+      // 2. Test profiles table
+      const { data, error: dbError } = await supabase.from('profiles').select('*').limit(1);
+      
+      if (dbError) {
+        setConnectionStatus('error');
+        if (dbError.message.includes('relation "public.profiles" does not exist')) {
+          setDiagInfo('Tabela "profiles" não encontrada. Execute o SQL em SUPABASE_SETUP.sql.');
         } else {
-          setDiagInfo(`Erro Supabase: ${error.message}`);
+          setDiagInfo(`Erro DB: ${dbError.message}`);
         }
       } else {
         setConnectionStatus('ok');
-        setDiagInfo('Conexão estabelecida e tabela detectada!');
+        setDiagInfo(`Conectado! ${data && data.length > 0 ? 'Dados encontrados.' : 'Tabela vazia (ok).'}`);
       }
     } catch (e: any) {
       setConnectionStatus('error');
@@ -51,53 +60,91 @@ export const Welcome: React.FC<WelcomeProps> = ({ onLogin, onRegister }) => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-10 bg-dark-bg relative overflow-hidden">
-      {/* Diagnostics */}
+      {/* Diagnostics & Config Help */}
       <div className="absolute top-6 left-6 z-50 flex flex-col gap-2">
-        {!isConfigured && (
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="glass border-red-500/20 p-3 rounded-xl flex items-center gap-3"
-          >
-            <AlertTriangle size={16} className="text-red-500" />
-            <span className="text-[9px] font-black text-red-500 uppercase tracking-widest">Supabase não configurado</span>
-          </motion.div>
-        )}
-
-        <motion.button
-          onClick={testConnection}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className={cn(
-            "glass p-3 rounded-xl flex items-center gap-3 transition-colors",
-            "border-white/5",
-            connectionStatus === 'ok' && "border-green-500/20 bg-green-500/5",
-            connectionStatus === 'error' && "border-red-500/20 bg-red-500/5"
-          )}
-        >
-          {connectionStatus === 'testing' ? (
-            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-              <Zap size={14} className="text-vibrant-orange" />
+        <div className="flex items-center gap-2">
+          {!isConfigured && (
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="glass border-red-500/20 p-3 rounded-xl flex items-center gap-3 cursor-pointer"
+              onClick={() => setShowConfigHelp(!showConfigHelp)}
+            >
+              <AlertTriangle size={16} className="text-red-500" />
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black text-red-500 uppercase tracking-widest">Configuração Pendente</span>
+                <span className="text-[7px] text-red-500/60 uppercase">Clique para ajuda</span>
+              </div>
             </motion.div>
-          ) : connectionStatus === 'ok' ? (
-            <Check size={14} className="text-green-500" />
-          ) : (
-            <Database size={14} className="text-white/40" />
           )}
-          <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">
-            {connectionStatus === 'idle' ? 'Testar Conexão' : 
-             connectionStatus === 'testing' ? 'Verificando...' : 
-             connectionStatus === 'ok' ? 'Conectado' : 'Falha na Conexão'}
-          </span>
-        </motion.button>
-        
-        {diagInfo && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass p-3 rounded-xl max-w-[200px]"
+
+          <motion.button
+            onClick={testConnection}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className={cn(
+              "glass p-3 rounded-xl flex items-center gap-3 transition-colors",
+              "border-white/5",
+              connectionStatus === 'ok' && "border-green-500/20 bg-green-500/5",
+              connectionStatus === 'error' && "border-red-500/20 bg-red-500/5"
+            )}
           >
-            <p className="text-[8px] text-white/40 font-mono break-words">{diagInfo}</p>
+            {connectionStatus === 'testing' ? (
+              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                <Zap size={14} className="text-vibrant-orange" />
+              </motion.div>
+            ) : connectionStatus === 'ok' ? (
+              <Check size={14} className="text-green-500" />
+            ) : (
+              <Database size={14} className="text-white/40" />
+            )}
+            <div className="flex flex-col items-start">
+              <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">
+                {connectionStatus === 'idle' ? 'Status Backend' : 
+                 connectionStatus === 'testing' ? 'Verificando...' : 
+                 connectionStatus === 'ok' ? 'Online' : 'Offline'}
+              </span>
+              <span className="text-[7px] text-white/30 uppercase">Supabase Cloud</span>
+            </div>
+          </motion.button>
+        </div>
+        
+        {(diagInfo || showConfigHelp) && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass p-4 rounded-xl max-w-[300px] border-white/10 shadow-2xl"
+          >
+            {diagInfo && (
+              <div className="mb-4">
+                <p className="text-[10px] font-mono text-vibrant-orange mb-1">LOG DE DIAGNÓSTICO:</p>
+                <p className="text-[11px] text-white/70 leading-relaxed font-mono break-words">{diagInfo}</p>
+              </div>
+            )}
+            
+            {(showConfigHelp || !isConfigured) && (
+              <div className="space-y-3">
+                <p className="text-[10px] font-mono text-vibrant-orange uppercase">Como Corrigir:</p>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] flex-shrink-0">1</div>
+                    <p className="text-[9px] text-white/50">Vá em <b>Settings</b> no menu lateral aqui do AI Studio.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] flex-shrink-0">2</div>
+                    <p className="text-[9px] text-white/50">Crie <b>VITE_SUPABASE_URL</b> e <b>VITE_SUPABASE_ANON_KEY</b> nos Secrets.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] flex-shrink-0">3</div>
+                    <p className="text-[9px] text-white/50">Para o <b>Railway</b>, você deve adicionar essas mesmas variáveis lá no Dashboard da Railway.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] flex-shrink-0">4</div>
+                    <p className="text-[9px] text-white/50">Execute o código do arquivo <b>SUPABASE_SETUP.sql</b> no editor SQL do Supabase.</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </div>
