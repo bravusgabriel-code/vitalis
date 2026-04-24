@@ -41,21 +41,29 @@ DROP POLICY IF EXISTS "Allow individual insert" ON public.profiles;
 CREATE POLICY "Allow individual insert" ON public.profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
--- 4. Função e Trigger para criação automática (Opcional, mas recomendado para evitar erros de sincronização)
--- Se você usar este trigger, o backend do app tentará fazer upsert e funcionará normalmente.
-
+-- 4. Função e Trigger para criação automática
+-- Esta função é chamada quando um usuário se registra no Auth
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, nome, email, cpf)
+  INSERT INTO public.profiles (id, nome, email, cpf, updated_at)
   VALUES (
     new.id, 
-    new.raw_user_meta_data->>'name', 
+    COALESCE(new.raw_user_meta_data->>'name', ''), 
     new.email,
-    new.raw_user_meta_data->>'cpf'
+    COALESCE(new.raw_user_meta_data->>'cpf', ''),
+    NOW()
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET
+    nome = EXCLUDED.nome,
+    email = EXCLUDED.email,
+    cpf = CASE WHEN EXCLUDED.cpf <> '' THEN EXCLUDED.cpf ELSE profiles.cpf END,
+    updated_at = NOW();
   RETURN new;
+EXCEPTION WHEN OTHERS THEN
+  -- Se houver erro (ex: CPF duplicado), ainda assim permite a criação do usuário no Auth
+  -- O app tentará fazer o upsert manual em seguida e mostrará o erro específico
+  RETURN new; 
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

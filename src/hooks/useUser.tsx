@@ -169,25 +169,33 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log("Upserting perfil no Supabase...");
       try {
-        const { error: upsertError } = await supabase.from('profiles').upsert({
+        const supabaseUpdate: any = {
           id: data.user.id,
           nome: profileToSave.name,
           email: profileToSave.email,
           cpf: profileToSave.cpf,
-          data_nascimento: profileToSave.birthDate,
-          cidade: profileToSave.city,
-          estado: profileToSave.state,
-          peso: profileToSave.weight,
-          altura: profileToSave.height,
-          genero: profileToSave.gender,
-          has_doctor: profileToSave.hasDoctor,
-          doctor_name: profileToSave.doctorName,
-          doctor_id: profileToSave.doctorId,
-          xp: profileToSave.xp,
-          nivel: profileToSave.level,
-          streak: profileToSave.streak,
+          data_nascimento: profileToSave.birthDate || null,
+          cidade: profileToSave.city || null,
+          estado: profileToSave.state || null,
+          peso: profileToSave.weight || null,
+          altura: profileToSave.height || null,
+          genero: profileToSave.gender || null,
+          has_doctor: profileToSave.hasDoctor || false,
+          doctor_name: profileToSave.doctorName || null,
+          xp: profileToSave.xp || 0,
+          nivel: profileToSave.level || 1,
+          streak: profileToSave.streak || 0,
           updated_at: new Date().toISOString()
-        });
+        };
+
+        // Only add doctor_id if it's a valid non-empty string
+        if (profileToSave.doctorId && profileToSave.doctorId.trim() !== '') {
+          supabaseUpdate.doctor_id = profileToSave.doctorId;
+        } else {
+          supabaseUpdate.doctor_id = null;
+        }
+
+        const { error: upsertError } = await supabase.from('profiles').upsert(supabaseUpdate);
 
         if (upsertError) {
           console.error("Erro no upsert profiles:", upsertError);
