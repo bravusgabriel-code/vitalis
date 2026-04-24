@@ -19,5 +19,7 @@ Este erro geralmente ocorre se:
 - O Trigger `on_auth_user_created` está tentando inserir dados em colunas que não existem.
 - Você está tentando registrar um e-mail ou CPF que já existe (e há uma restrição UNIQUE).
 
-### "Supabase not configured"
-Verifique se as variáveis `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` estão configuradas nos **Secrets** do AI Studio.
+### "Supabase not configured" (Especialmente no Railway)
+1. Verifique se as variáveis `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` estão configuradas nos **Variables** do Dashboard da Railway.
+2. **IMPORTANTE:** Após clicar em "Add" ou alterar uma variável no Railway, você **PRECISA** clicar em **Redeploy** na aba de Deployments. Como o Vite "injeta" as variáveis durante o build, elas não aparecerão se o build antigo for mantido.
+3. Certifique-se de que não há espaços extras ou aspas nos valores das variáveis.

@@ -40,7 +40,7 @@ export const Welcome: React.FC<WelcomeProps> = ({ onLogin, onRegister }) => {
       if (dbError) {
         setConnectionStatus('error');
         if (dbError.message.includes('relation "public.profiles" does not exist')) {
-          setDiagInfo('Tabela "profiles" não encontrada. Execute o SQL em SUPABASE_SETUP.sql.');
+          setDiagInfo('Tabela "profiles" não encontrada. Execute o SQL em SUPABASE_SETUP.sql no Dashboard do Supabase.');
         } else {
           setDiagInfo(`Erro DB: ${dbError.message}`);
         }
@@ -50,7 +50,8 @@ export const Welcome: React.FC<WelcomeProps> = ({ onLogin, onRegister }) => {
       }
     } catch (e: any) {
       setConnectionStatus('error');
-      setDiagInfo(`Exceção: ${e.message}`);
+      const diag = supabase.getDiagnosticInfo();
+      setDiagInfo(`Exceção: ${e.message}. Status: URL=${diag.urlValue}, KEY=${diag.keyPrefix}, ENV=${diag.envMode}`);
     }
   };
 
@@ -134,9 +135,9 @@ export const Welcome: React.FC<WelcomeProps> = ({ onLogin, onRegister }) => {
                     <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] flex-shrink-0">2</div>
                     <p className="text-[9px] text-white/50">Crie <b>VITE_SUPABASE_URL</b> e <b>VITE_SUPABASE_ANON_KEY</b> nos Secrets.</p>
                   </div>
-                  <div className="flex gap-2">
-                    <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] flex-shrink-0">3</div>
-                    <p className="text-[9px] text-white/50">Para o <b>Railway</b>, você deve adicionar essas mesmas variáveis lá no Dashboard da Railway.</p>
+                  <div className="flex gap-2 text-vibrant-orange font-bold">
+                    <AlertTriangle size={10} className="flex-shrink-0" />
+                    <p className="text-[9px]">IMPORTANTE: No Railway, após clicar em "Add", você PRECISA fazer um novo "Redeploy" para que as variáveis entrem em vigor no código do navegador.</p>
                   </div>
                   <div className="flex gap-2">
                     <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] flex-shrink-0">4</div>

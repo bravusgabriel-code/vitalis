@@ -27,18 +27,26 @@ const mockSupabase = {
 
 export const supabase = new Proxy({} as any, {
   get(target, prop) {
-    const isValidUrl = supabaseUrl && (supabaseUrl.startsWith('http://') || supabaseUrl.startsWith('https://'));
-    const isConfigured = !!(isValidUrl && supabaseAnonKey);
+    // In production (Railway), import.meta.env might be baked. 
+    // We check if it's actually there.
+    const url = supabaseUrl;
+    const key = supabaseAnonKey;
+    
+    const isValidUrl = url && (url.startsWith('http://') || url.startsWith('https://'));
+    const isConfigured = !!(isValidUrl && key);
 
     if (prop === 'isConfigured') return isConfigured;
     
     if (prop === 'getDiagnosticInfo') {
       return () => ({
         isConfigured,
-        hasUrl: !!supabaseUrl,
+        hasUrl: !!url,
+        urlValue: url ? `${url.substring(0, 10)}...` : 'not-found',
         isValidUrl,
-        hasAnonKey: !!supabaseAnonKey,
-        urlPrefix: supabaseUrl ? supabaseUrl.substring(0, 5) : 'none'
+        hasAnonKey: !!key,
+        keyPrefix: key ? `${key.substring(0, 10)}...` : 'not-found',
+        envMode: import.meta.env.MODE,
+        isProduction: import.meta.env.PROD
       });
     }
 
