@@ -186,9 +186,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           updated_at: new Date().toISOString()
         });
 
-        if (upsertError) console.error("Erro no upsert profiles:", upsertError);
-      } catch (e) {
+        if (upsertError) {
+          console.error("Erro no upsert profiles:", upsertError);
+          throw new Error(`Erro ao salvar perfil: ${upsertError.message}`);
+        }
+      } catch (e: any) {
         console.error("Exceção no registro Supabase:", e);
+        throw e;
       }
     } else {
       console.warn("Nenhum usuário retornado no data. Talvez confirmação de e-mail pendente?");

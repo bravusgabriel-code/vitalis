@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Card } from '../../components/UI';
 import { motion } from 'framer-motion';
-import { Activity, Zap, TrendingUp, ShieldCheck, Database, AlertTriangle } from 'lucide-react';
+import { Activity, Zap, TrendingUp, ShieldCheck, Database, AlertTriangle, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { cn } from '../../lib/utils';
 
 interface WelcomeProps {
   onLogin: () => void;
@@ -11,6 +12,38 @@ interface WelcomeProps {
 
 export const Welcome: React.FC<WelcomeProps> = ({ onLogin, onRegister }) => {
   const [isConfigured, setIsConfigured] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
+  const [diagInfo, setDiagInfo] = useState<string>('');
+
+  const testConnection = async () => {
+    setConnectionStatus('testing');
+    try {
+      const diag = supabase.getDiagnosticInfo();
+      if (!diag.isConfigured) {
+        setConnectionStatus('error');
+        setDiagInfo('Chaves Supabase ausentes nos Secrets.');
+        return;
+      }
+
+      // Test simple query to see if table exists
+      const { error } = await supabase.from('profiles').select('id').limit(1);
+      
+      if (error) {
+        setConnectionStatus('error');
+        if (error.message.includes('relation "public.profiles" does not exist')) {
+          setDiagInfo('Tabela "profiles" não encontrada. Execute o SQL de setup.');
+        } else {
+          setDiagInfo(`Erro Supabase: ${error.message}`);
+        }
+      } else {
+        setConnectionStatus('ok');
+        setDiagInfo('Conexão estabelecida e tabela detectada!');
+      }
+    } catch (e: any) {
+      setConnectionStatus('error');
+      setDiagInfo(`Exceção: ${e.message}`);
+    }
+  };
 
   useEffect(() => {
     setIsConfigured(supabase.isConfigured);
@@ -18,6 +51,57 @@ export const Welcome: React.FC<WelcomeProps> = ({ onLogin, onRegister }) => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-10 bg-dark-bg relative overflow-hidden">
+      {/* Diagnostics */}
+      <div className="absolute top-6 left-6 z-50 flex flex-col gap-2">
+        {!isConfigured && (
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="glass border-red-500/20 p-3 rounded-xl flex items-center gap-3"
+          >
+            <AlertTriangle size={16} className="text-red-500" />
+            <span className="text-[9px] font-black text-red-500 uppercase tracking-widest">Supabase não configurado</span>
+          </motion.div>
+        )}
+
+        <motion.button
+          onClick={testConnection}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className={cn(
+            "glass p-3 rounded-xl flex items-center gap-3 transition-colors",
+            "border-white/5",
+            connectionStatus === 'ok' && "border-green-500/20 bg-green-500/5",
+            connectionStatus === 'error' && "border-red-500/20 bg-red-500/5"
+          )}
+        >
+          {connectionStatus === 'testing' ? (
+            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+              <Zap size={14} className="text-vibrant-orange" />
+            </motion.div>
+          ) : connectionStatus === 'ok' ? (
+            <Check size={14} className="text-green-500" />
+          ) : (
+            <Database size={14} className="text-white/40" />
+          )}
+          <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">
+            {connectionStatus === 'idle' ? 'Testar Conexão' : 
+             connectionStatus === 'testing' ? 'Verificando...' : 
+             connectionStatus === 'ok' ? 'Conectado' : 'Falha na Conexão'}
+          </span>
+        </motion.button>
+        
+        {diagInfo && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass p-3 rounded-xl max-w-[200px]"
+          >
+            <p className="text-[8px] text-white/40 font-mono break-words">{diagInfo}</p>
+          </motion.div>
+        )}
+      </div>
+
       {/* Visual Identity Background */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-vibrant-orange/5 blur-[150px] rounded-full animate-pulse" />
