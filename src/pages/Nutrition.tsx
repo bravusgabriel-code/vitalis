@@ -80,7 +80,8 @@ const FoodInputForm: React.FC<{
 
   useEffect(() => {
     const searchFoods = async () => {
-      if (!searchTerm || searchTerm.length < 2) {
+      const term = searchTerm.toLowerCase().trim();
+      if (!term || term.length < 2) {
         setFoods([]);
         return;
       }
@@ -89,14 +90,26 @@ const FoodInputForm: React.FC<{
       try {
         // Try Supabase first
         if (supabase.isConfigured) {
+          // Professional search logic: items starting with the term first, then items containing it
           const { data, error } = await supabase
             .from('foods')
             .select('*')
-            .ilike('name', `%${searchTerm}%`)
-            .limit(20);
+            .or(`name_normalized.ilike.${term}%,name_normalized.ilike.%${term}%`)
+            .limit(15); // Fetch a bit more to allow frontend sorting
           
           if (!error && data && data.length > 0) {
-            setFoods(data);
+            // Sort to ensure "starts with" comes first
+            const sorted = [...data].sort((a, b) => {
+              const aNorm = a.name_normalized || a.name.toLowerCase();
+              const bNorm = b.name_normalized || b.name.toLowerCase();
+              const aStarts = aNorm.startsWith(term);
+              const bStarts = bNorm.startsWith(term);
+              if (aStarts && !bStarts) return -1;
+              if (!aStarts && bStarts) return 1;
+              return aNorm.localeCompare(bNorm);
+            }).slice(0, 10);
+
+            setFoods(sorted);
             setIsSearching(false);
             return;
           }
@@ -104,10 +117,24 @@ const FoodInputForm: React.FC<{
 
         // Fallback to local Dexie if Supabase not configured or no results
         const localFoods = await db.foods
-          .filter(food => food.name.toLowerCase().includes(searchTerm.toLowerCase()))
+          .filter(food => {
+             const norm = (food.name_normalized || food.name).toLowerCase();
+             return norm.includes(term);
+          })
           .limit(20)
           .toArray();
-        setFoods(localFoods);
+
+        const sortedLocal = localFoods.sort((a, b) => {
+          const aNorm = (a.name_normalized || a.name).toLowerCase();
+          const bNorm = (b.name_normalized || b.name).toLowerCase();
+          const aStarts = aNorm.startsWith(term);
+          const bStarts = bNorm.startsWith(term);
+          if (aStarts && !bStarts) return -1;
+          if (!aStarts && bStarts) return 1;
+          return aNorm.localeCompare(bNorm);
+        }).slice(0, 10);
+
+        setFoods(sortedLocal);
       } catch (err) {
         console.error('Search error:', err);
       } finally {
